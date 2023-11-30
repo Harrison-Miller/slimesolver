@@ -70,13 +70,43 @@ func TestBasicBoard(t *testing.T) {
 	}
 }
 
+type testCase struct {
+	name   string
+	state  string
+	inputs []Direction
+	want   string
+}
+
+func testCases(t *testing.T, cases []testCase) {
+	for _, tc := range cases {
+		testGame(t, tc)
+	}
+}
+
+func testGame(t *testing.T, tc testCase) {
+	t.Run(tc.name, func(t *testing.T) {
+		state := cleanState(tc.state)
+
+		g := Game{}
+		err := g.Parse(state)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		for _, dir := range tc.inputs {
+			g.Move(dir)
+		}
+
+		want := cleanState(tc.want)
+		result := strings.TrimSpace(g.String())
+		if result != want {
+			t.Fatalf("expected:\n%s\ngot\n%s", want, result)
+		}
+	})
+}
+
 func TestBasicMovement(t *testing.T) {
-	tt := []struct {
-		name   string
-		state  string
-		inputs []Direction
-		want   string
-	}{
+	tt := []testCase{
 		{
 			name: "no move",
 			state: `...
@@ -139,36 +169,11 @@ func TestBasicMovement(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			state := cleanState(tc.state)
-
-			g := Game{}
-			err := g.Parse(state)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			for _, dir := range tc.inputs {
-				g.Move(dir)
-			}
-
-			want := cleanState(tc.want)
-			result := strings.TrimSpace(g.String())
-			if result != want {
-				t.Fatalf("expected:\n%s\ngot\n%s", want, result)
-			}
-		})
-	}
+	testCases(t, tt)
 }
 
 func TestMovingTowardsEachother(t *testing.T) {
-	tt := []struct {
-		name   string
-		state  string
-		inputs []Direction
-		want   string
-	}{
+	tt := []testCase{
 		{
 			name:   "left 2 slimes",
 			state:  `.@@`,
@@ -239,57 +244,22 @@ func TestMovingTowardsEachother(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			state := cleanState(tc.state)
-
-			g := Game{}
-			err := g.Parse(state)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			for _, dir := range tc.inputs {
-				g.Move(dir)
-			}
-
-			want := cleanState(tc.want)
-			result := strings.TrimSpace(g.String())
-			if result != want {
-				t.Fatalf("expected:\n%s\ngot\n%s", want, result)
-			}
-		})
-	}
+	testCases(t, tt)
 }
 
 func TestPit(t *testing.T) {
-	game := Game{}
-	err := game.Parse(`.@.
-					   		 ..O`)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	inputs := []Direction{Down, Right}
-	for _, dir := range inputs {
-		game.Move(dir)
-	}
-
-	want := cleanState(`...
-							  ..O`)
-	result := strings.TrimSpace(game.String())
-	if result != want {
-		t.Fatalf("expected:\n%s\ngot\n%s", want, result)
-	}
+	testGame(t, testCase{
+		name: "pit",
+		state: `.@.
+				..O`,
+		inputs: []Direction{Down, Right},
+		want: `...
+			   ..O`,
+	})
 }
 
 func TestBoxes(t *testing.T) {
-	tt := []struct {
-		name   string
-		state  string
-		inputs []Direction
-		want   string
-	}{
+	tt := []testCase{
 		{
 			name:   "boxes don't move on their own",
 			state:  `.#.`,
@@ -384,45 +354,73 @@ func TestBoxes(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			state := cleanState(tc.state)
-
-			g := Game{}
-			err := g.Parse(state)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			for _, dir := range tc.inputs {
-				g.Move(dir)
-			}
-
-			want := cleanState(tc.want)
-			result := strings.TrimSpace(g.String())
-			if result != want {
-				t.Fatalf("expected:\n%s\ngot\n%s", want, result)
-			}
-		})
-	}
+	testCases(t, tt)
 }
 
 func TestBoxWithPit(t *testing.T) {
-	game := Game{}
-	err := game.Parse(`.@.B.O.#`)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	testGame(t, testCase{
+		name:   "box falls into pit",
+		state:  `.@.B.O.#`,
+		inputs: []Direction{Right, Right, Right, Right, Right},
+		want:   `......@#`,
+	})
+}
+
+func TestSwitchAndDoor(t *testing.T) {
+	tt := []testCase{
+		{
+			name:   "door blocks movement",
+			state:  `@D.`,
+			inputs: []Direction{Right, Right},
+			want:   `@D.`,
+		},
+		{
+			name:   "switch doesn't block movement",
+			state:  `@X.`,
+			inputs: []Direction{Right, Right},
+			want:   `.X@`,
+		},
+		{
+			name:   "slime on switch opens door",
+			state:  `@XD.`,
+			inputs: []Direction{Right},
+			want:   `.@_.`,
+		},
+		{
+			name:   "door stays open when slime doesn't move off",
+			state:  `@X#D`,
+			inputs: []Direction{Right, Right, Right},
+			want:   `.@#_`,
+		},
+		{
+			name:   "box on switch opens door",
+			state:  `@BXD`,
+			inputs: []Direction{Right},
+			want:   `.@B_`,
+		},
+		{
+			name:   "box can't go through closed door",
+			state:  `@BD.`,
+			inputs: []Direction{Right, Right},
+			want:   `@BD.`,
+		},
+		{
+			name: "slime can go through open door",
+			state: `@X#.
+					@.D.`,
+			inputs: []Direction{Right, Right, Right},
+			want: `.@#.
+			       .._@`,
+		},
+		{
+			name: "box can go through open door",
+			state: `@X#..
+					@BD..`,
+			inputs: []Direction{Right, Right, Right},
+			want: `.@#..
+			       .._@B`,
+		},
 	}
 
-	inputs := []Direction{Right, Right, Right, Right, Right}
-	for _, dir := range inputs {
-		game.Move(dir)
-	}
-
-	// box fills pit
-	want := cleanState(`......@#`)
-	result := strings.TrimSpace(game.String())
-	if result != want {
-		t.Fatalf("expected:\n%s\ngot\n%s", want, result)
-	}
+	testCases(t, tt)
 }

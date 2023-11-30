@@ -8,11 +8,14 @@ import (
 type Token rune
 
 const (
-	WallToken  Token = '#'
-	EmptyToken Token = '.'
-	PitToken   Token = 'O'
-	BoxToken   Token = 'B'
-	SlimeToken Token = '@'
+	WallToken       Token = '#'
+	EmptyToken      Token = '.'
+	PitToken        Token = 'O'
+	SwitchToken     Token = 'X'
+	ClosedDoorToken Token = 'D'
+	OpenDoorToken   Token = '_'
+	BoxToken        Token = 'B'
+	SlimeToken      Token = '@'
 )
 
 type Direction int
@@ -76,7 +79,7 @@ func (g *Game) GetActors(x, y int) []Actor {
 	return l
 }
 
-func (g *Game) GetEntitiesWithToken(token Token) []Actor {
+func (g *Game) GetActorsWithToken(token Token) []Actor {
 	l := make([]Actor, 0)
 	for _, actor := range g.actors {
 		if actor.Token() == token {
@@ -95,14 +98,26 @@ func (g *Game) RemoveActor(actor Actor) {
 	}
 }
 
-func getPriorityToken(entities []Actor) Token {
-	var priority Token
-	for _, entity := range entities {
-		if entity.Token() > priority {
-			priority = entity.Token()
+func getPriorityToken(actors []Actor) Token {
+	var token Token
+	priority := -1
+	for _, actor := range actors {
+		t := actor.Token()
+		p := 0
+		switch t {
+		case SlimeToken:
+			p = 10
+		case BoxToken:
+			p = 5
+		default:
+			p = 0
+		}
+		if p > priority {
+			token = t
+			priority = p
 		}
 	}
-	return priority
+	return token
 }
 
 func (g *Game) String() string {
@@ -164,6 +179,12 @@ func (g *Game) Parse(state string) error {
 			case BoxToken:
 				g.board[y][x] = EmptyToken
 				g.actors = append(g.actors, NewBox(x, y))
+			case SwitchToken:
+				g.board[y][x] = EmptyToken
+				g.actors = append(g.actors, NewSwitch(x, y))
+			case ClosedDoorToken:
+				g.board[y][x] = EmptyToken
+				g.actors = append(g.actors, NewDoor(x, y))
 			default:
 				return fmt.Errorf("invalid token: %c", c)
 			}
