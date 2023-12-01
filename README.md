@@ -14,3 +14,6 @@ To solve this problem we create a graph of events and then solve steps starting 
 - Slimes die in pits
 - Crates block pits
 - Crate can not push other crates
+- Switches open all doors
+- Boxes and slimes can move onto and activate switches
+- Doors block slimes and crates when closed
