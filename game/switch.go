@@ -1,6 +1,8 @@
 package game
 
-import "slimesolver/game/math"
+import (
+	"slimesolver/game/math"
+)
 
 type Switch struct {
 	PositionComponent
@@ -16,16 +18,21 @@ func (s *Switch) Token() Token {
 	return SwitchToken
 }
 
+func doorEdges(g *Game) []math.Vector2 {
+	doors := g.GetActorsWithTokens([]Token{ClosedDoorToken, OpenDoorToken})
+	edges := make([]math.Vector2, 0)
+	for _, door := range doors {
+		edges = append(edges, door.GetPosition())
+	}
+
+	return edges
+}
+
 func (s *Switch) CalculateEdges(g *Game, dir Direction, a Actor) []math.Vector2 {
 	if a != nil {
+		// if something is moving onto us
 		if a.Token() == BoxToken || a.Token() == SlimeToken {
-			// get the doors
-			doors := g.GetActorsWithToken(ClosedDoorToken)
-			edges := make([]math.Vector2, 0)
-			for _, door := range doors {
-				edges = append(edges, door.GetPosition())
-			}
-			return edges
+			return doorEdges(g)
 		}
 	}
 

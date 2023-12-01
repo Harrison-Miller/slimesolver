@@ -41,31 +41,17 @@ func runGame(levelData string) {
 		dir := game.Zero
 		restart := false
 		switch input {
-		case "w":
-			fallthrough
-		case "up":
+		case "w", "up":
 			dir = game.Up
-		case "a":
-			fallthrough
-		case "left":
+		case "a", "left":
 			dir = game.Left
-		case "s":
-			fallthrough
-		case "down":
+		case "s", "down":
 			dir = game.Down
-		case "d":
-			fallthrough
-		case "right":
+		case "d", "right":
 			dir = game.Right
-		case "q":
-			fallthrough
-		case "quit":
+		case "q", "exit", "quit":
 			os.Exit(0)
-		case "r":
-			fallthrough
-		case "restart":
-			fallthrough
-		case "reset":
+		case "r", "restart", "reset":
 			restart = true
 		}
 

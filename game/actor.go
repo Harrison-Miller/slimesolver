@@ -1,7 +1,6 @@
 package game
 
 import (
-	"fmt"
 	"slimesolver/game/math"
 )
 
@@ -20,36 +19,6 @@ type PositionComponent struct {
 
 func (p *PositionComponent) GetPosition() math.Vector2 {
 	return math.Vector2{p.X, p.Y}
-}
-
-type MoveableComponent struct {
-	PositionComponent
-}
-
-func (m *MoveableComponent) ApplyEdges(g *Game, edges []math.Vector2) {
-	for _, edge := range edges {
-		if g.IsWallOrEdge(edge.X, edge.Y) {
-			fmt.Println("Can't move because of wall or edge")
-			continue
-		}
-
-		actors := g.GetActors(edge.X, edge.Y)
-		foundSolid := false
-		for _, actor := range actors {
-			if actor.Solid() {
-				fmt.Println("Can't move because of solid actor")
-				foundSolid = true
-				break
-			}
-		}
-
-		if foundSolid {
-			continue
-		}
-
-		m.X = edge.X
-		m.Y = edge.Y
-	}
 }
 
 func moveVector(vec math.Vector2, dir Direction) math.Vector2 {

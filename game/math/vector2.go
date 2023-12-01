@@ -9,3 +9,7 @@ type Vector2 struct {
 func (v Vector2) String() string {
 	return fmt.Sprintf("(%d, %d)", v.X, v.Y)
 }
+
+func (v Vector2) Equals(other Vector2) bool {
+	return v.X == other.X && v.Y == other.Y
+}

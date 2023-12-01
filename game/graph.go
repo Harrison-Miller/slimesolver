@@ -18,7 +18,7 @@ func (n *LocationNode) String() string {
 		if i == 0 {
 			sb.WriteString(" -> ")
 		} else {
-			sb.WriteString("\t -> ")
+			sb.WriteString("\n\t -> ")
 		}
 		sb.WriteString(actor.String())
 	}
@@ -50,9 +50,14 @@ func (n *ActorNode) String() string {
 			if i == 0 {
 				sb.WriteString(" -> ")
 			} else {
-				sb.WriteString("\t -> ")
+				sb.WriteString("\n\t -> ")
 			}
-			sb.WriteString(edge.String())
+
+			if !edge.Position.Equals(n.Position) {
+				sb.WriteString(edge.String())
+			} else {
+				sb.WriteString("self")
+			}
 		}
 	} else {
 		for i, edge := range n.EdgePositions {
@@ -230,6 +235,10 @@ func (g *Graph) GetRoots() []*LocationNode {
 	for _, node := range g.nodes {
 		found := false
 		for _, otherNode := range g.nodes {
+			if otherNode == node {
+				continue
+			}
+
 			for _, actor := range otherNode.Actors {
 				for _, edge := range actor.Edges {
 					if edge == node {
@@ -258,7 +267,12 @@ func (g *Graph) GetLeaves() []*ActorNode {
 	leaves := make([]*ActorNode, 0)
 	for _, node := range g.nodes {
 		for _, actor := range node.Actors {
-			if len(actor.Edges) == 0 {
+			onlySelfEdge := false
+			if len(actor.Edges) == 1 && actor.Edges[0] == node {
+				onlySelfEdge = true
+			}
+
+			if len(actor.Edges) == 0 || onlySelfEdge {
 				leaves = append(leaves, actor)
 			}
 		}

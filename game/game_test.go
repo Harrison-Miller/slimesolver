@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -95,6 +96,7 @@ func testGame(t *testing.T, tc testCase) {
 
 		for _, dir := range tc.inputs {
 			g.Move(dir)
+			fmt.Println(g.String())
 		}
 
 		want := cleanState(tc.want)
@@ -376,25 +378,25 @@ func TestSwitchAndDoor(t *testing.T) {
 		},
 		{
 			name:   "switch doesn't block movement",
-			state:  `@X.`,
+			state:  `@x.`,
 			inputs: []Direction{Right, Right},
-			want:   `.X@`,
+			want:   `.x@`,
 		},
 		{
 			name:   "slime on switch opens door",
-			state:  `@XD.`,
+			state:  `@xD.`,
 			inputs: []Direction{Right},
 			want:   `.@_.`,
 		},
 		{
 			name:   "door stays open when slime doesn't move off",
-			state:  `@X#D`,
-			inputs: []Direction{Right, Right, Right},
+			state:  `@x#D`,
+			inputs: []Direction{Right, Right},
 			want:   `.@#_`,
 		},
 		{
 			name:   "box on switch opens door",
-			state:  `@BXD`,
+			state:  `@BxD`,
 			inputs: []Direction{Right},
 			want:   `.@B_`,
 		},
@@ -406,7 +408,7 @@ func TestSwitchAndDoor(t *testing.T) {
 		},
 		{
 			name: "slime can go through open door",
-			state: `@X#.
+			state: `@x#.
 					@.D.`,
 			inputs: []Direction{Right, Right, Right},
 			want: `.@#.
@@ -414,11 +416,43 @@ func TestSwitchAndDoor(t *testing.T) {
 		},
 		{
 			name: "box can go through open door",
-			state: `@X#..
+			state: `@x#..
 					@BD..`,
 			inputs: []Direction{Right, Right, Right},
 			want: `.@#..
 			       .._@B`,
+		},
+		{
+			name:   "door closes when slime moves off switch",
+			state:  `@x.D`,
+			inputs: []Direction{Right, Right},
+			want:   `.x@D`,
+		},
+		{
+			name:   "door stays open when box moves off but slimes moves on",
+			state:  `@Bx..D`,
+			inputs: []Direction{Right, Right},
+			want:   `..@B._`,
+		},
+		{
+			name: "can't move through a closing door",
+			state: `@x.#.
+					@.D..`,
+			inputs: []Direction{Right, Right, Right},
+			want: `.x@#.
+			       .@D..`,
+		},
+		{
+			name:   "the problem (tm)",
+			state:  `@@D.@Bx..`,
+			inputs: []Direction{Right, Right, Right},
+			want:   `..D@@.x@B`,
+		},
+		{
+			name:   "slime push box on switch stay still",
+			state:  `@Bx#D`,
+			inputs: []Direction{Right, Right},
+			want:   `.@B#_`,
 		},
 	}
 

@@ -11,7 +11,7 @@ const (
 	WallToken       Token = '#'
 	EmptyToken      Token = '.'
 	PitToken        Token = 'O'
-	SwitchToken     Token = 'X'
+	SwitchToken     Token = 'x'
 	ClosedDoorToken Token = 'D'
 	OpenDoorToken   Token = '_'
 	BoxToken        Token = 'B'
@@ -79,11 +79,14 @@ func (g *Game) GetActors(x, y int) []Actor {
 	return l
 }
 
-func (g *Game) GetActorsWithToken(token Token) []Actor {
+func (g *Game) GetActorsWithTokens(tokens []Token) []Actor {
 	l := make([]Actor, 0)
 	for _, actor := range g.actors {
-		if actor.Token() == token {
-			l = append(l, actor)
+		for _, token := range tokens {
+			if actor.Token() == token {
+				l = append(l, actor)
+				break
+			}
 		}
 	}
 	return l
@@ -194,11 +197,30 @@ func (g *Game) Parse(state string) error {
 	return nil
 }
 
-func (g *Game) extendGraph(graph *Graph, previous *ActorNode, current *LocationNode) {
+func (g *Game) extendGraph(graph *Graph, previous *ActorNode, current *LocationNode, visited []*ActorNode) {
 	for _, actorNode := range current.Actors {
-		if actorNode.Edges != nil && len(actorNode.Edges) > 0 {
+		// check if we've already visited this node
+		found := false
+		for _, v := range visited {
+			if v == actorNode {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+
+		onlySelfEdge := false
+		if len(actorNode.Edges) == 1 && previous != nil {
+			if actorNode.Edges[0].Position.Equals(actorNode.Position) {
+				onlySelfEdge = true
+			}
+		}
+
+		if !onlySelfEdge && actorNode.Edges != nil && len(actorNode.Edges) > 0 {
 			for _, edge := range actorNode.Edges {
-				g.extendGraph(graph, actorNode, edge)
+				g.extendGraph(graph, actorNode, edge, append(visited, actorNode))
 			}
 		} else if previous != nil { // extend leaf nodes
 			// TODO: since we're replacing the edges, the order of this matters, so we'll need to choose based on depth
@@ -207,7 +229,7 @@ func (g *Game) extendGraph(graph *Graph, previous *ActorNode, current *LocationN
 			if len(newEdges) != 0 {
 				graph.UpdateActorEdges(actorNode, newEdges)
 				for _, edge := range actorNode.Edges {
-					g.extendGraph(graph, actorNode, edge)
+					g.extendGraph(graph, actorNode, edge, append(visited, actorNode))
 				}
 			}
 		}
@@ -228,7 +250,7 @@ func (g *Game) Move(dir Direction) {
 	// extend gameGraph
 	roots := gameGraph.GetRoots()
 	for _, root := range roots {
-		g.extendGraph(gameGraph, nil, root)
+		g.extendGraph(gameGraph, nil, root, nil)
 	}
 	fmt.Println("extended gameGraph:")
 	fmt.Println(gameGraph)
@@ -237,6 +259,7 @@ func (g *Game) Move(dir Direction) {
 		leaves := gameGraph.PopLeaves()
 		for _, leaf := range leaves {
 			if leaf.Actor != nil {
+				fmt.Printf("%s applying edges: %v\n", string(leaf.Actor.Token()), leaf.EdgePositions)
 				leaf.Actor.ApplyEdges(g, leaf.EdgePositions)
 			}
 		}
