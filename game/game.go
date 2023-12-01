@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"slimesolver/game/math"
 	"strings"
 )
 
@@ -11,11 +12,13 @@ const (
 	WallToken       Token = '#'
 	EmptyToken      Token = '.'
 	PitToken        Token = 'O'
+	SlimeToken      Token = '@'
+	BoxToken        Token = 'B'
 	SwitchToken     Token = 'x'
 	ClosedDoorToken Token = 'D'
 	OpenDoorToken   Token = '_'
-	BoxToken        Token = 'B'
-	SlimeToken      Token = '@'
+	SpikeUpToken    Token = '^'
+	SpikeDownToken  Token = '-'
 )
 
 type Direction int
@@ -68,11 +71,11 @@ func (g *Game) IsWallOrEdge(x, y int) bool {
 	return g.GetTokenAt(x, y) == WallToken
 }
 
-func (g *Game) GetActors(x, y int) []Actor {
+func (g *Game) GetActors(pos math.Vector2) []Actor {
 	l := make([]Actor, 0)
 	for _, entity := range g.actors {
 		v := entity.GetPosition()
-		if v.X == x && v.Y == y {
+		if pos.Equals(v) {
 			l = append(l, entity)
 		}
 	}
@@ -127,7 +130,7 @@ func (g *Game) String() string {
 	var sb strings.Builder
 	for y, row := range g.board {
 		for x, token := range row {
-			actors := g.GetActors(x, y)
+			actors := g.GetActors(math.Vector2{x, y})
 			if len(actors) > 0 {
 				token = getPriorityToken(actors)
 			}
@@ -188,6 +191,9 @@ func (g *Game) Parse(state string) error {
 			case ClosedDoorToken:
 				g.board[y][x] = EmptyToken
 				g.actors = append(g.actors, NewDoor(x, y))
+			case SpikeUpToken, SpikeDownToken:
+				g.board[y][x] = EmptyToken
+				g.actors = append(g.actors, NewSpike(x, y, Token(c) == SpikeUpToken))
 			default:
 				return fmt.Errorf("invalid token: %c", c)
 			}

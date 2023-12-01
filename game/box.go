@@ -42,7 +42,7 @@ func (b *Box) ApplyEdges(g *Game, edges []math.Vector2) {
 			continue
 		}
 
-		actors := g.GetActors(edge.X, edge.Y)
+		actors := g.GetActors(edge)
 		foundSolid := false
 		for _, actor := range actors {
 			if actor == b {
