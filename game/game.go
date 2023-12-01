@@ -227,6 +227,8 @@ func (g *Game) extendGraph(graph *Graph, previous *ActorNode, current *LocationN
 			dir := directionBetween(previous.Actor.GetPosition(), actorNode.Actor.GetPosition())
 			newEdges := actorNode.Actor.CalculateEdges(g, dir, previous.Actor)
 			if len(newEdges) != 0 {
+				//fmt.Printf("extend %v %s -> %v\n", actorNode.Position, string(actorNode.Actor.Token()), newEdges)
+				// TODO: maybe this should merge the edges instead of resetting
 				graph.UpdateActorEdges(actorNode, newEdges)
 				for _, edge := range actorNode.Edges {
 					g.extendGraph(graph, actorNode, edge, append(visited, actorNode))
@@ -252,14 +254,18 @@ func (g *Game) Move(dir Direction) {
 	for _, root := range roots {
 		g.extendGraph(gameGraph, nil, root, nil)
 	}
+	gameGraph.CleanGraph()
 	fmt.Println("extended gameGraph:")
 	fmt.Println(gameGraph)
 
+	steps := 0
 	for gameGraph.HasLeaves() {
 		leaves := gameGraph.PopLeaves()
+		fmt.Printf("step: %d moves: %d\n", steps, len(leaves))
+		steps++
 		for _, leaf := range leaves {
 			if leaf.Actor != nil {
-				fmt.Printf("%s applying edges: %v\n", string(leaf.Actor.Token()), leaf.EdgePositions)
+				fmt.Printf("apply %v %s -> %v\n", leaf.Position, string(leaf.Actor.Token()), leaf.EdgePositions)
 				leaf.Actor.ApplyEdges(g, leaf.EdgePositions)
 			}
 		}

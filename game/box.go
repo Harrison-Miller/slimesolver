@@ -20,14 +20,17 @@ func (b *Box) Token() Token {
 }
 
 func (b *Box) CalculateEdges(g *Game, dir Direction, a Actor) []math.Vector2 {
-	if a != nil && a.Token() == SlimeToken {
-		move := moveVector(b.GetPosition(), dir)
-		// check if we can move
-		if g.IsWallOrEdge(move.X, move.Y) {
-			return []math.Vector2{b.GetPosition()}
-		}
+	if a != nil {
+		if a.Token() == SlimeToken {
+			move := moveVector(b.GetPosition(), dir)
+			// check if we can move
+			if g.IsWallOrEdge(move.X, move.Y) {
+				return []math.Vector2{b.GetPosition()}
+			}
 
-		return []math.Vector2{move}
+			return []math.Vector2{move}
+		}
+		return []math.Vector2{}
 	}
 	return []math.Vector2{b.GetPosition()}
 }

@@ -458,3 +458,46 @@ func TestSwitchAndDoor(t *testing.T) {
 
 	testCases(t, tt)
 }
+
+func TestBoxThroughDoor(t *testing.T) {
+	tt := []testCase{
+		{
+			name:   "box through door",
+			state:  `@x#@BD..`,
+			inputs: []Direction{Right, Right, Right},
+			want:   `.@#.._@B`,
+		},
+		{
+			name:   "door stays open with box on switch",
+			state:  `xB@#D`,
+			inputs: []Direction{Left, Right},
+			want:   `B.@#_`,
+		},
+		{
+			name:   "move slime through door with box on switch",
+			state:  `xB@D.`,
+			inputs: []Direction{Left, Right, Right, Right},
+			want:   `B.._@`,
+		},
+		{
+			name:   "move box through door with box on switch",
+			state:  `xB@BD..`,
+			inputs: []Direction{Left, Right, Right, Right, Right},
+			want:   `B..._@B`,
+		},
+		{
+			name:   "move box through door with box on switch",
+			state:  `xB@BD..`,
+			inputs: []Direction{Left, Right, Right, Right},
+			want:   `B...@B.`,
+		},
+		{
+			name:   "move box through 2 doors with box on switch",
+			state:  `xB@BDD..`,
+			inputs: []Direction{Left, Right, Right, Right, Right, Right},
+			want:   `B...__@B`,
+		},
+	}
+
+	testCases(t, tt)
+}

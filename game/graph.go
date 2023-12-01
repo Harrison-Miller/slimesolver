@@ -18,7 +18,9 @@ func (n *LocationNode) String() string {
 		if i == 0 {
 			sb.WriteString(" -> ")
 		} else {
-			sb.WriteString("\n\t -> ")
+			sb.WriteString("\n")
+			sb.WriteString(n.Position.String())
+			sb.WriteString(" -> ")
 		}
 		sb.WriteString(actor.String())
 	}
@@ -297,4 +299,39 @@ func (g *Graph) PopLeaves() []*ActorNode {
 	//})
 
 	return leaves
+}
+
+func (g *Graph) CleanGraph() {
+	// remove self edges
+	for _, node := range g.nodes {
+		for _, actor := range node.Actors {
+			for i, edge := range actor.Edges {
+				if edge == node {
+					actor.Edges = append(actor.Edges[:i], actor.Edges[i+1:]...)
+					break
+				}
+			}
+
+			for i, position := range actor.EdgePositions {
+				if position.Equals(node.Position) {
+					actor.EdgePositions = append(actor.EdgePositions[:i], actor.EdgePositions[i+1:]...)
+					break
+				}
+			}
+		}
+	}
+
+	// remove actors with no edges
+	//toRemove := make([]*ActorNode, 0)
+	//for _, node := range g.nodes {
+	//	for _, actor := range node.Actors {
+	//		if len(actor.EdgePositions) == 0 {
+	//			toRemove = append(toRemove, actor)
+	//		}
+	//	}
+	//}
+	//
+	//for _, actor := range toRemove {
+	//	g.RemoveActorNode(actor)
+	//}
 }

@@ -34,7 +34,7 @@ func runGame(levelData string) {
 		var input string
 		_, err := fmt.Scanln(&input)
 		if err != nil {
-			log.Fatal(err)
+			continue
 		}
 		input = strings.ToLower(input)
 
