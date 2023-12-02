@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"slimesolver/game/math"
 )
 
@@ -28,59 +29,79 @@ func (s *Slime) String() string {
 	return string(s.Token())
 }
 
-func (s *Slime) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
+func possibleBlockerStates(affectingStates AffectingStates) map[Actor]StateChange {
+	possibleBlockers := affectingStates.GoingToStates
+	for actor, change := range affectingStates.WatchingStates {
+		possibleBlockers[actor] = change
+	}
+	return possibleBlockers
+}
+
+func (s *Slime) Transform(g *Game, dir Direction, affectingStates AffectingStates) (*StateChange, Actor) {
 	pos := s.GetPosition()
 	move := moveVector(pos, dir)
-	canMove := !g.IsWallOrEdge(move.X, move.Y)
-	updates := make([]Actor, 0)
+	nextChange := &StateChange{
+		Move: move,
+	}
 	var parent Actor
-	message := ""
-	for a, change := range affectingStates {
-		if change.Move.Equals(s.GetPosition()) {
-			parent = a
-		}
 
-		if change.Message == "grow" && s.small {
-			message = "combine"
-		}
+	// things moving to where we are need to wait for us to move
+	// so they become our parent
+	for actor, _ := range affectingStates.OnToStates {
+		parent = actor
+	}
 
-		// what we're moving into
-		apos := a.GetPosition()
-		if apos.Equals(move) {
-			token := a.Token()
-			if token == OpenDoorToken || token == ClosedDoorToken {
-				if change.Message == "close" {
-					canMove = false
-					updates = append(updates, a)
-				}
-			}
+	// can't move if we're going to hit a wall
+	if g.IsWallOrEdge(move.X, move.Y) {
+		nextChange.Move = pos
+	}
 
-			if (token == BoxToken || token == SlimeToken) && s.small {
-				if change.Move.Equals(apos) {
-					canMove = false
-					updates = append(updates, a)
-				}
+	// doors that aren't opening block our movement
+	if len(affectingStates.GoingToStates) > 0 {
+		fmt.Println("going to states: ", affectingStates.GoingToStates)
+	}
+	possibleBlockers := possibleBlockerStates(affectingStates) // includes going to and watched states
+	for actor, change := range possibleBlockers {
+		token := actor.Token()
+		if token == OpenDoorToken || token == ClosedDoorToken {
+			if change.Message == "close" {
+				nextChange.Move = pos
+				nextChange.Watching = append(nextChange.Watching, actor) // we need to keep track of this actor in future transforms
 			}
 		}
 	}
 
-	if !canMove {
-		if parent != nil && s.small && parent.Token() == SmallSlimeToken {
-			message = "grow"
-			updates = append(updates, parent)
+	if s.small {
+		// small slime is blocked by boxes and normal slimes
+		for actor, _ := range possibleBlockers {
+			token := actor.Token()
+			switch token {
+			case BoxToken, SlimeToken:
+				nextChange.Move = pos
+				nextChange.Watching = append(nextChange.Watching, actor) // we need to keep track of this actor in future transforms
+			}
 		}
 
-		return &StateChange{
-			Move:    pos,
-			Message: message,
-			Updates: updates,
-		}, parent
+		// if this slime is not going to move
+		// and another small slime will move into it this turn
+		// then we need to grow
+		if nextChange.Move.Equals(pos) {
+			for actor, _ := range affectingStates.OnToStates {
+				if actor.Token() == SmallSlimeToken {
+					nextChange.Message = "grow"
+				}
+			}
+		}
+
+		// if we're moving into another small slime, we need to combine
+		for actor, change := range affectingStates.GoingToStates {
+			if actor.Token() == SmallSlimeToken && change.Message == "grow" {
+				nextChange.Message = "combine"
+			}
+		}
 	}
 
-	return &StateChange{
-		Move:    move,
-		Message: message,
-	}, parent
+	return nextChange, parent
 }
 
 func (s *Slime) Apply(g *Game, change StateChange) {

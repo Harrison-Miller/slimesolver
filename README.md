@@ -8,16 +8,39 @@ This is because the order in which the slimes move can affect the outcome of the
 To solve this problem we create a graph of events and then solve steps starting from the leaves
 
 ## Rules
-- Actors can only move in cardinal directions
-- Actors can not move off the grid or into walls
-- Slimes can push crates
-- Slimes die in pits
-- Slimes hit by spikes split into two smaller slimes
-- Small slimes can't push crates
-- Small slimes can't activate switches
-- Small slimes can combine if they move into the same square
-- Crates block pits
-- Crate can not push other crates
-- Switches open all doors
-- Boxes and slimes can move onto and activate switches
+### Actors
+- Can only move in cardinal directions
+- Can not move off the grid or into walls
+- Block movement unless specified
+
+### Slime
+- Can push crates (only 1)
+- Die in pits
+- If damaged splits into two smaller slimes
+
+### Small Slime
+- Can not push crates
+- Can not activate switches
+- Combine into a Slime if they move into the same square
+
+### Crate
+- Block pits
+- Can not push other crates
+
+### Switches
+- Can be activated by crates and slimes
+- When activated open all doors
+- Don't block movement
+
+### Doors
 - Doors block slimes and crates when closed
+
+### Spikes
+- Kill slimes when activated
+- Activated every other turn
+- Don't block movement
+
+### Pusher
+- Push slimes and crates in the direction they are facing when activated
+- Activated every other turn
+- Don't block movement

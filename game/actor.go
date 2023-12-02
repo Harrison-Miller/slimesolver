@@ -5,22 +5,41 @@ import (
 	"strings"
 )
 
+type StateChange struct {
+	From     math.Vector2
+	Move     math.Vector2
+	Updates  []Actor
+	Watching []Actor
+	Message  string
+}
+
+type AffectingStates struct {
+	FromStates     map[Actor]StateChange // actors moving off of us
+	OnToStates     map[Actor]StateChange // actors moving onto us
+	GoingToStates  map[Actor]StateChange // actors we're going to move onto
+	UpdateStates   map[Actor]StateChange // actors that are updating us
+	WatchingStates map[Actor]StateChange // actors that we are watching
+}
+
+func NewAffectingStates() AffectingStates {
+	return AffectingStates{
+		FromStates:     make(map[Actor]StateChange),
+		OnToStates:     make(map[Actor]StateChange),
+		GoingToStates:  make(map[Actor]StateChange),
+		UpdateStates:   make(map[Actor]StateChange),
+		WatchingStates: make(map[Actor]StateChange),
+	}
+}
+
 type Actor interface {
 	Token() Token
 	String() string
 	GetPosition() math.Vector2
-	Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor)
+	Transform(g *Game, dir Direction, affectingStates AffectingStates) (*StateChange, Actor)
 	Apply(g *Game, change StateChange)
 	Tick(g *Game)
 	Solid() bool
 	Damage(g *Game)
-}
-
-type StateChange struct {
-	From    math.Vector2
-	Move    math.Vector2
-	Updates []Actor // TODO: split this into watching and updating
-	Message string
 }
 
 func (s StateChange) String() string {
@@ -44,6 +63,20 @@ func (s StateChange) String() string {
 		for i, update := range s.Updates {
 			sb.WriteString(update.String())
 			if i < len(s.Updates)-1 {
+				sb.WriteString(", ")
+			}
+		}
+		sb.WriteString("]")
+	}
+
+	if s.Watching != nil && len(s.Watching) > 0 {
+		if sb.Len() > 0 {
+			sb.WriteString(" ")
+		}
+		sb.WriteString("W: [")
+		for i, watch := range s.Watching {
+			sb.WriteString(watch.String())
+			if i < len(s.Watching)-1 {
 				sb.WriteString(", ")
 			}
 		}

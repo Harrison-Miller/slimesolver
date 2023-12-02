@@ -228,12 +228,3 @@ func TestSmallSlime(t *testing.T) {
 
 	testCases(t, tt)
 }
-
-func TestOneThing(t *testing.T) {
-	testGame(t, testCase{
-		name:   "don't combine against door that opens",
-		state:  `ooD#@x`,
-		inputs: []Direction{Right},
-		want:   `.oo#.@`,
-	})
-}

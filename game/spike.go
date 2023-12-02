@@ -23,7 +23,7 @@ func (s *Spike) String() string {
 	return string(s.Token())
 }
 
-func (s *Spike) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
+func (s *Spike) Transform(g *Game, dir Direction, affectingStates AffectingStates) (*StateChange, Actor) {
 	return nil, nil
 }
 

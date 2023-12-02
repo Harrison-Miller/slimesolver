@@ -18,21 +18,24 @@ func (b *Box) String() string {
 	return string(b.Token())
 }
 
-func (b *Box) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
-	for actor, change := range affectingStates {
-		if actor.Token() == SlimeToken {
-			if change.Move.Equals(b.GetPosition()) {
-				dir = directionBetween(change.From, b.GetPosition())
-				move := moveVector(b.GetPosition(), dir)
-				return &StateChange{
-					Move: move,
-				}, actor
-			}
+func (b *Box) Transform(g *Game, dir Direction, affectingStates AffectingStates) (*StateChange, Actor) {
+	pos := b.GetPosition()
+	// something pushing the box
+	for actor, change := range affectingStates.OnToStates {
+		token := actor.Token()
+		switch token {
+		case SlimeToken:
+			dir = directionBetween(change.From, b.GetPosition())
+			move := moveVector(pos, dir)
+			return &StateChange{
+				Move: move,
+			}, actor
 		}
 	}
 
+	// otherwise slime stands still
 	return &StateChange{
-		Move: b.GetPosition(),
+		Move: pos,
 	}, nil
 }
 

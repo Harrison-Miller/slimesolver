@@ -1,8 +1,6 @@
 package game
 
-import (
-	"slimesolver/game/math"
-)
+import "slimesolver/game/math"
 
 type Door struct {
 	PositionComponent
@@ -26,37 +24,30 @@ func (d *Door) String() string {
 	return string(d.Token())
 }
 
-func (d *Door) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
-	open := false
-	var openActor Actor
-	var otherActor Actor
-	for actor, state := range affectingStates {
-		if actor.Token() == SwitchToken {
-			open = true
-			openActor = actor
-		}
-
-		if actor.Token() == BoxToken || actor.Token() == SlimeToken {
-			if state.Move.Equals(d.GetPosition()) {
-				otherActor = actor
-			}
-		}
-	}
-
-	if open {
-		if otherActor != nil { // doing this forces the slime to move after
-			openActor = otherActor
-		}
-		return &StateChange{
-			Move:    math.NegVec,
-			Message: "open",
-		}, openActor
-	}
-
-	return &StateChange{
+func (d *Door) Transform(g *Game, dir Direction, affectingStates AffectingStates) (*StateChange, Actor) {
+	nextChange := &StateChange{
 		Move:    math.NegVec,
 		Message: "close",
-	}, otherActor
+	}
+	var parent Actor
+
+	// switch activated by something
+	for actor, _ := range affectingStates.UpdateStates {
+		token := actor.Token()
+		switch token {
+		case SwitchToken:
+			nextChange.Message = "open"
+			parent = actor
+		}
+	}
+
+	// make moving objects dependent on the door
+	// parents move after children
+	for actor, _ := range affectingStates.OnToStates {
+		parent = actor
+	}
+
+	return nextChange, parent
 }
 
 func (d *Door) Apply(g *Game, change StateChange) {

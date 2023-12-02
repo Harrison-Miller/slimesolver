@@ -10,17 +10,19 @@ import (
 type Token rune
 
 const (
-	WallToken       Token = '#'
-	EmptyToken      Token = '.'
-	PitToken        Token = 'O'
-	SlimeToken      Token = '@'
-	SmallSlimeToken       = 'o'
-	BoxToken        Token = 'B'
-	SwitchToken     Token = 'x'
-	ClosedDoorToken Token = 'D'
-	OpenDoorToken   Token = '_'
-	SpikeUpToken    Token = '^'
-	SpikeDownToken  Token = '-'
+	WallToken         Token = '#'
+	EmptyToken        Token = '.'
+	PitToken          Token = 'O'
+	SlimeToken        Token = '@'
+	SmallSlimeToken         = 'o'
+	BoxToken          Token = 'B'
+	SwitchToken       Token = 'x'
+	ClosedDoorToken   Token = 'D'
+	OpenDoorToken     Token = '_'
+	SpikeUpToken      Token = '^'
+	SpikeDownToken    Token = '-'
+	PusherToken       Token = '='
+	PusherActiveToken Token = '['
 )
 
 type Direction int
@@ -270,45 +272,50 @@ func (s *StateChangeNode) Equals(other *StateChangeNode) bool {
 	return s.Change.Equals(other.Change)
 }
 
-func getAffectingStates(states StateList, actor Actor) map[Actor]StateChange {
-	affectingStates := make(map[Actor]StateChange, 0)
+func getAffectingStates(states StateList, actor Actor) AffectingStates {
+	affectingStates := NewAffectingStates()
 	var myChange *StateChangeNode
 	myChange = states[actor]
 
 	for a, node := range states {
-		if a == actor {
+		if a == actor { // we don't get our own state
 			continue
 		}
 
-		pos := actor.GetPosition()
-		// something moving onto us
-		if node.Change.Move.Equals(pos) {
-			affectingStates[a] = node.Change
+		myPos := actor.GetPosition()
+		apos := a.GetPosition()
+
+		// actors moving onto us
+		if node.Change.Move.Equals(myPos) {
+			affectingStates.OnToStates[a] = node.Change
 		}
 
-		// something moving off of us
-		if node.Change.From.Equals(pos) {
-			affectingStates[a] = node.Change
+		// actors moving off of us
+		if node.Change.From.Equals(myPos) {
+			affectingStates.FromStates[a] = node.Change
 		}
 
-		// something we're moving to
-		if myChange != nil && myChange.Change.Move.Equals(a.GetPosition()) {
-			affectingStates[a] = node.Change
+		// actors we're going to move onto
+		if myChange != nil {
+			if (node.Change.Move.Equals(math.NegVec) && myChange.Change.Move.Equals(apos)) ||
+				myChange.Change.Move.Equals(node.Change.Move) {
+				affectingStates.GoingToStates[a] = node.Change
+			}
 		}
 
-		// something updating us
+		// actors updating us
 		for _, update := range node.Change.Updates {
 			if update == actor {
-				affectingStates[a] = node.Change
+				affectingStates.UpdateStates[a] = node.Change
 				break
 			}
 		}
 
-		// something we're updating
+		// actors we're watching
 		if myChange != nil {
-			for _, update := range myChange.Change.Updates {
-				if update == a {
-					affectingStates[a] = node.Change
+			for _, watch := range myChange.Change.Watching {
+				if watch == a {
+					affectingStates.WatchingStates[a] = node.Change
 					break
 				}
 			}
