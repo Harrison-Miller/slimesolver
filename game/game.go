@@ -416,7 +416,7 @@ func (g *Game) Move(dir Direction) {
 	step := 1
 	changed := true
 	for changed {
-		if step > 10 {
+		if step > 25 {
 			panic("too many steps")
 		}
 

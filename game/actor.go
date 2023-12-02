@@ -19,7 +19,7 @@ type Actor interface {
 type StateChange struct {
 	From    math.Vector2
 	Move    math.Vector2
-	Updates []Actor
+	Updates []Actor // TODO: split this into watching and updating
 	Message string
 }
 

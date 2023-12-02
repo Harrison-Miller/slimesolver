@@ -12,6 +12,10 @@ To solve this problem we create a graph of events and then solve steps starting 
 - Actors can not move off the grid or into walls
 - Slimes can push crates
 - Slimes die in pits
+- Slimes hit by spikes split into two smaller slimes
+- Small slimes can't push crates
+- Small slimes can't activate switches
+- Small slimes can combine if they move into the same square
 - Crates block pits
 - Crate can not push other crates
 - Switches open all doors
