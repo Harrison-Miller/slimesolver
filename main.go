@@ -21,7 +21,7 @@ func main() {
 const helpText = `w|up, s|down, a|left, d|right, q|quit, r|restart`
 
 func runGame(levelData string) {
-	g := game.Game{}
+	g := game.NewGame(false)
 	err := g.Parse(levelData)
 	if err != nil {
 		log.Fatal(err)

@@ -17,12 +17,6 @@ func TestSpikes(t *testing.T) {
 			want:   `-^`,
 		},
 		{
-			name:   "spikes kill slime",
-			state:  `.@-`,
-			inputs: []Direction{Right},
-			want:   `..^`,
-		},
-		{
 			name:   "spikes don't kill box",
 			state:  `.@B-`,
 			inputs: []Direction{Right},

@@ -1,75 +1,142 @@
 package game
 
 import (
-	"fmt"
 	"slimesolver/game/math"
 )
 
 type Slime struct {
 	PositionComponent
+	small        bool
+	lastPosition math.Vector2
 }
 
-func NewSlime(x, y int) *Slime {
+func NewSlime(x, y int, small bool) *Slime {
 	return &Slime{
 		PositionComponent: PositionComponent{x, y},
+		small:             small,
 	}
 }
 
 func (s *Slime) Token() Token {
+	if s.small {
+		return SmallSlimeToken
+	}
 	return SlimeToken
 }
 
-func (s *Slime) CalculateEdges(g *Game, dir Direction, a Actor) []math.Vector2 {
-	if a == nil && dir != Zero {
-		move := moveVector(s.GetPosition(), dir)
-
-		// check if we can move
-		if g.IsWallOrEdge(move.X, move.Y) {
-			return []math.Vector2{s.GetPosition()}
-		}
-
-		return []math.Vector2{move}
-	}
-	return []math.Vector2{}
+func (s *Slime) String() string {
+	return string(s.Token())
 }
 
-func (s *Slime) ApplyEdges(g *Game, edges []math.Vector2) {
-	for _, edge := range edges {
-		if g.IsWallOrEdge(edge.X, edge.Y) {
-			fmt.Println("Can't move because of wall or edge")
-			continue
+func (s *Slime) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
+	pos := s.GetPosition()
+	move := moveVector(pos, dir)
+	canMove := !g.IsWallOrEdge(move.X, move.Y)
+	updates := make([]Actor, 0)
+	var parent Actor
+	message := ""
+	for a, change := range affectingStates {
+		if change.Move.Equals(s.GetPosition()) {
+			parent = a
 		}
 
-		actors := g.GetActors(edge)
-		foundSolid := false
-		for _, actor := range actors {
-			if actor == s {
-				continue
+		if change.Message == "grow" && s.small {
+			message = "combine"
+		}
+
+		// what we're moving into
+		apos := a.GetPosition()
+		if apos.Equals(move) {
+			token := a.Token()
+			if token == OpenDoorToken || token == ClosedDoorToken {
+				if change.Message == "close" {
+					canMove = false
+					updates = append(updates, a)
+				}
 			}
 
-			if actor.Solid() {
-				fmt.Printf("Can't move because of solid actor - %s\n", string(actor.Token()))
-				foundSolid = true
-				break
+			if (token == BoxToken || token == SlimeToken) && s.small {
+				if change.Move.Equals(apos) {
+					canMove = false
+					updates = append(updates, a)
+				}
 			}
 		}
-
-		if foundSolid {
-			continue
-		}
-
-		s.X = edge.X
-		s.Y = edge.Y
 	}
+
+	if !canMove {
+		if parent != nil && s.small && parent.Token() == SmallSlimeToken {
+			message = "grow"
+			updates = append(updates, parent)
+		}
+
+		return &StateChange{
+			Move:    pos,
+			Message: message,
+			Updates: updates,
+		}, parent
+	}
+
+	return &StateChange{
+		Move:    move,
+		Message: message,
+	}, parent
 }
 
-func (s *Slime) ResolveState(g *Game) {
-	token := g.GetTokenAt(s.X, s.Y)
-	if token == PitToken {
-		g.RemoveActor(s)
+func (s *Slime) Apply(g *Game, change StateChange) {
+	if change.Message == "grow" {
+		s.small = false
+	} else if change.Message == "combine" {
+		g.Kill(s)
+	}
+
+	// check if we can move
+	canMove := canMoveTo(g, change.Move, s)
+	if !canMove {
+		return
+	}
+
+	s.lastPosition = s.GetPosition()
+	s.X = change.Move.X
+	s.Y = change.Move.Y
+}
+
+func (s *Slime) Tick(g *Game) {
+	// die if we're on a pit
+	if g.IsPit(s.X, s.Y) {
+		g.Kill(s)
+		return
 	}
 }
 
 func (s *Slime) Solid() bool {
 	return true
+}
+
+func (s *Slime) Damage(g *Game) {
+	if s.small {
+		g.Kill(s)
+		return
+	}
+
+	s.small = true
+
+	spawnLocations := s.getSpawnLocations()
+	for _, loc := range spawnLocations {
+		if canMoveTo(g, loc, s) {
+			g.AddActor(NewSlime(loc.X, loc.Y, true))
+			return
+		}
+	}
+}
+
+func (s *Slime) getSpawnLocations() []math.Vector2 {
+	pos := s.GetPosition()
+	return []math.Vector2{
+		s.lastPosition,
+		moveVector(pos, Up),
+		moveVector(pos, Down),
+		moveVector(pos, Left),
+		moveVector(pos, Right),
+	}
 }

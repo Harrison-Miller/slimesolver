@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"slimesolver/game/math"
+	"sort"
 	"strings"
 )
 
@@ -13,6 +14,7 @@ const (
 	EmptyToken      Token = '.'
 	PitToken        Token = 'O'
 	SlimeToken      Token = '@'
+	SmallSlimeToken       = 'o'
 	BoxToken        Token = 'B'
 	SwitchToken     Token = 'x'
 	ClosedDoorToken Token = 'D'
@@ -53,6 +55,28 @@ type Game struct {
 
 	// there can be multiple actors on the same tile
 	actors []Actor
+
+	killQueue []Actor
+
+	logging bool
+}
+
+func NewGame(logging bool) *Game {
+	return &Game{
+		logging: logging,
+	}
+}
+
+func (g *Game) Println(args ...interface{}) {
+	if g.logging {
+		fmt.Println(args...)
+	}
+}
+
+func (g *Game) Printf(format string, args ...interface{}) {
+	if g.logging {
+		fmt.Printf(format, args...)
+	}
 }
 
 func (g *Game) GetTokenAt(x, y int) Token {
@@ -69,6 +93,14 @@ func (g *Game) IsWallOrEdge(x, y int) bool {
 	}
 
 	return g.GetTokenAt(x, y) == WallToken
+}
+
+func (g *Game) IsPit(x, y int) bool {
+	return g.GetTokenAt(x, y) == PitToken
+}
+
+func (g *Game) AddActor(actor Actor) {
+	g.actors = append(g.actors, actor)
 }
 
 func (g *Game) GetActors(pos math.Vector2) []Actor {
@@ -93,6 +125,10 @@ func (g *Game) GetActorsWithTokens(tokens []Token) []Actor {
 		}
 	}
 	return l
+}
+
+func (g *Game) Kill(actor Actor) {
+	g.killQueue = append(g.killQueue, actor)
 }
 
 func (g *Game) RemoveActor(actor Actor) {
@@ -179,9 +215,9 @@ func (g *Game) Parse(state string) error {
 				g.board[y][x] = EmptyToken
 			case PitToken:
 				g.board[y][x] = PitToken
-			case SlimeToken:
+			case SlimeToken, SmallSlimeToken:
 				g.board[y][x] = EmptyToken
-				g.actors = append(g.actors, NewSlime(x, y))
+				g.actors = append(g.actors, NewSlime(x, y, Token(c) == SmallSlimeToken))
 			case BoxToken:
 				g.board[y][x] = EmptyToken
 				g.actors = append(g.actors, NewBox(x, y))
@@ -203,83 +239,222 @@ func (g *Game) Parse(state string) error {
 	return nil
 }
 
-func (g *Game) extendGraph(graph *Graph, previous *ActorNode, current *LocationNode, visited []*ActorNode) {
-	for _, actorNode := range current.Actors {
-		// check if we've already visited this node
-		found := false
-		for _, v := range visited {
-			if v == actorNode {
-				found = true
-				break
-			}
-		}
-		if found {
+type StateList map[Actor]*StateChangeNode
+
+type StateChangeNode struct {
+	Actor       Actor
+	Change      StateChange
+	ParentActor Actor
+	Parent      *StateChangeNode
+	Depth       int
+}
+
+func (s *StateChangeNode) String() string {
+	var sb strings.Builder
+	if s.Parent != nil {
+		sb.WriteString(s.Parent.String())
+	} else {
+		sb.WriteString(fmt.Sprintf("%v ", s.Actor.GetPosition()))
+	}
+	sb.WriteString(fmt.Sprintf("%v -> %v ", s.Actor, s.Change))
+	return sb.String()
+}
+
+func (s *StateChangeNode) Equals(other *StateChangeNode) bool {
+	if other == nil {
+		return false
+	}
+	if s.Parent != other.Parent {
+		return false
+	}
+	return s.Change.Equals(other.Change)
+}
+
+func getAffectingStates(states StateList, actor Actor) map[Actor]StateChange {
+	affectingStates := make(map[Actor]StateChange, 0)
+	var myChange *StateChangeNode
+	myChange = states[actor]
+
+	for a, node := range states {
+		if a == actor {
 			continue
 		}
 
-		onlySelfEdge := false
-		if len(actorNode.Edges) == 1 && previous != nil {
-			if actorNode.Edges[0].Position.Equals(actorNode.Position) {
-				onlySelfEdge = true
+		pos := actor.GetPosition()
+		// something moving onto us
+		if node.Change.Move.Equals(pos) {
+			affectingStates[a] = node.Change
+		}
+
+		// something moving off of us
+		if node.Change.From.Equals(pos) {
+			affectingStates[a] = node.Change
+		}
+
+		// something we're moving to
+		if myChange != nil && myChange.Change.Move.Equals(a.GetPosition()) {
+			affectingStates[a] = node.Change
+		}
+
+		// something updating us
+		for _, update := range node.Change.Updates {
+			if update == actor {
+				affectingStates[a] = node.Change
+				break
 			}
 		}
 
-		if !onlySelfEdge && actorNode.Edges != nil && len(actorNode.Edges) > 0 {
-			for _, edge := range actorNode.Edges {
-				g.extendGraph(graph, actorNode, edge, append(visited, actorNode))
-			}
-		} else if previous != nil { // extend leaf nodes
-			// TODO: since we're replacing the edges, the order of this matters, so we'll need to choose based on depth
-			dir := directionBetween(previous.Actor.GetPosition(), actorNode.Actor.GetPosition())
-			newEdges := actorNode.Actor.CalculateEdges(g, dir, previous.Actor)
-			if len(newEdges) != 0 {
-				//fmt.Printf("extend %v %s -> %v\n", actorNode.Position, string(actorNode.Actor.Token()), newEdges)
-				// TODO: maybe this should merge the edges instead of resetting
-				graph.UpdateActorEdges(actorNode, newEdges)
-				for _, edge := range actorNode.Edges {
-					g.extendGraph(graph, actorNode, edge, append(visited, actorNode))
+		// something we're updating
+		if myChange != nil {
+			for _, update := range myChange.Change.Updates {
+				if update == a {
+					affectingStates[a] = node.Change
+					break
 				}
 			}
 		}
 	}
+	return affectingStates
+}
+
+func (g *Game) getNextStates(states StateList, dir Direction) StateList {
+	newStates := make(StateList, 0)
+	for _, actor := range g.actors {
+		affectingStates := getAffectingStates(states, actor)
+
+		if state, parentActor := actor.Transform(g, dir, affectingStates); state != nil {
+			state.From = actor.GetPosition()
+
+			// find parent node
+			var parent *StateChangeNode
+			depth := 0
+			if parentActor != nil {
+				parent = states[parentActor]
+				depth = parent.Depth + 1
+			}
+
+			node := &StateChangeNode{
+				Actor:       actor,
+				Change:      *state,
+				ParentActor: parentActor,
+				Parent:      parent,
+				Depth:       depth,
+			}
+			newStates[actor] = node
+		}
+	}
+	return newStates
+}
+
+func mergeStates(states StateList, newStates StateList) bool {
+	changed := false
+	for actor, state := range newStates {
+		if oldState, ok := states[actor]; ok {
+			if !oldState.Equals(state) {
+				changed = true
+				states[actor] = state // the state is different from the old one
+			}
+		} else {
+			changed = true
+			states[actor] = state // this is a new state
+		}
+
+	}
+
+	return changed
+}
+
+func getLeaves(states StateList) StateList {
+	leaves := make(StateList, 0)
+	for a, state := range states {
+		// check if anybody has this state as a parent
+		found := false
+		for _, otherState := range states {
+			if otherState.Parent == state {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			leaves[a] = state
+		}
+	}
+	return leaves
+}
+
+func hasLeaves(states StateList) bool {
+	leaves := getLeaves(states)
+	return len(leaves) > 0
+}
+
+type StateChangeLeaf struct {
+	Actor Actor
+	Node  *StateChangeNode
+}
+
+func popLeaves(states StateList) []StateChangeLeaf {
+	leaves := getLeaves(states)
+	for actor := range leaves {
+		delete(states, actor)
+	}
+
+	sortedLeaves := make([]StateChangeLeaf, 0)
+	for actor, node := range leaves {
+		sortedLeaves = append(sortedLeaves, StateChangeLeaf{actor, node})
+	}
+
+	sort.Slice(sortedLeaves, func(i, j int) bool {
+		return sortedLeaves[i].Node.Depth > sortedLeaves[j].Node.Depth
+	})
+
+	return sortedLeaves
 }
 
 func (g *Game) Move(dir Direction) {
-	// build gameGraph
-	gameGraph := NewGraph()
-	for _, entity := range g.actors {
-		edges := entity.CalculateEdges(g, dir, nil)
-		gameGraph.AddActorNode(NewActorNode(entity, edges))
-	}
-	gameGraph.Compute()
-	fmt.Printf("built gameGraph for move (%s):\n", dirString(dir))
-	fmt.Println(gameGraph)
-
-	// extend gameGraph
-	roots := gameGraph.GetRoots()
-	for _, root := range roots {
-		g.extendGraph(gameGraph, nil, root, nil)
-	}
-	gameGraph.CleanGraph()
-	fmt.Println("extended gameGraph:")
-	fmt.Println(gameGraph)
-
-	steps := 0
-	for gameGraph.HasLeaves() {
-		leaves := gameGraph.PopLeaves()
-		fmt.Printf("step: %d moves: %d\n", steps, len(leaves))
-		steps++
-		for _, leaf := range leaves {
-			if leaf.Actor != nil {
-				fmt.Printf("apply %v %s -> %v\n", leaf.Position, string(leaf.Actor.Token()), leaf.EdgePositions)
-				leaf.Actor.ApplyEdges(g, leaf.EdgePositions)
-			}
+	states := make(StateList, 0)
+	step := 1
+	changed := true
+	for changed {
+		if step > 10 {
+			panic("too many steps")
 		}
+
+		g.Println("calculating new states step: ", step)
+		step++
+		changed = mergeStates(states, g.getNextStates(states, dir))
+		if changed {
+			leaves := getLeaves(states)
+			for _, node := range leaves {
+				g.Println(node)
+			}
+		} else {
+			g.Println("no new states")
+		}
+
+		g.Println("----------")
 	}
 
-	// TODO: this probably needs to be sorted somehow
-	for _, actor := range g.actors {
-		actor.ResolveState(g)
+	step = 0
+	for hasLeaves(states) {
+		g.Println("apply states step: ", step)
+		step++
+		leaves := popLeaves(states)
+		for _, leaf := range leaves {
+			change := leaf.Node.Change
+			actor := leaf.Actor
+			g.Println("apply state:", change, " to actor:", actor)
+			actor.Apply(g, change)
+		}
+		g.Println("----------")
 	}
-	fmt.Println("--------------------")
+
+	for _, actor := range g.actors {
+		actor.Tick(g)
+	}
+
+	for _, actor := range g.killQueue {
+		g.RemoveActor(actor)
+	}
+	g.killQueue = make([]Actor, 0)
 }

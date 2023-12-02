@@ -1,10 +1,5 @@
 package game
 
-import (
-	"fmt"
-	"slimesolver/game/math"
-)
-
 type Box struct {
 	PositionComponent
 }
@@ -19,60 +14,52 @@ func (b *Box) Token() Token {
 	return BoxToken
 }
 
-func (b *Box) CalculateEdges(g *Game, dir Direction, a Actor) []math.Vector2 {
-	if a != nil {
-		if a.Token() == SlimeToken {
-			move := moveVector(b.GetPosition(), dir)
-			// check if we can move
-			if g.IsWallOrEdge(move.X, move.Y) {
-				return []math.Vector2{b.GetPosition()}
-			}
-
-			return []math.Vector2{move}
-		}
-		return []math.Vector2{}
-	}
-	return []math.Vector2{b.GetPosition()}
+func (b *Box) String() string {
+	return string(b.Token())
 }
 
-func (b *Box) ApplyEdges(g *Game, edges []math.Vector2) {
-	for _, edge := range edges {
-		if g.IsWallOrEdge(edge.X, edge.Y) {
-			fmt.Println("Can't move because of wall or edge")
-			continue
-		}
-
-		actors := g.GetActors(edge)
-		foundSolid := false
-		for _, actor := range actors {
-			if actor == b {
-				continue
-			}
-
-			if actor.Solid() {
-				fmt.Printf("Can't move because of solid actor - %s\n", string(actor.Token()))
-				foundSolid = true
-				break
+func (b *Box) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
+	for actor, change := range affectingStates {
+		if actor.Token() == SlimeToken {
+			if change.Move.Equals(b.GetPosition()) {
+				dir = directionBetween(change.From, b.GetPosition())
+				move := moveVector(b.GetPosition(), dir)
+				return &StateChange{
+					Move: move,
+				}, actor
 			}
 		}
-
-		if foundSolid {
-			continue
-		}
-
-		b.X = edge.X
-		b.Y = edge.Y
 	}
+
+	return &StateChange{
+		Move: b.GetPosition(),
+	}, nil
 }
 
-func (b *Box) ResolveState(g *Game) {
-	token := g.GetTokenAt(b.X, b.Y)
-	if token == PitToken {
-		g.RemoveActor(b)
+func (b *Box) Apply(g *Game, change StateChange) {
+	// check if we can move
+	canMove := canMoveTo(g, change.Move, b)
+	if !canMove {
+		return
+	}
+
+	b.X = change.Move.X
+	b.Y = change.Move.Y
+}
+
+func (b *Box) Tick(g *Game) {
+	// fall into pit
+	if g.IsPit(b.X, b.Y) {
 		g.SetTokenAt(b.X, b.Y, EmptyToken)
+		g.Kill(b)
+		return
 	}
 }
 
 func (b *Box) Solid() bool {
 	return true
+}
+
+func (b *Box) Damage(g *Game) {
+
 }

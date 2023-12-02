@@ -2,6 +2,8 @@ package math
 
 import "fmt"
 
+var NegVec = Vector2{-1, -1}
+
 type Vector2 struct {
 	X, Y int
 }

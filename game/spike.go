@@ -1,7 +1,5 @@
 package game
 
-import "slimesolver/game/math"
-
 type Spike struct {
 	PositionComponent
 	up bool
@@ -21,21 +19,26 @@ func (s *Spike) Token() Token {
 	return SpikeDownToken
 }
 
-func (s *Spike) CalculateEdges(g *Game, dir Direction, a Actor) []math.Vector2 {
-	return []math.Vector2{}
+func (s *Spike) String() string {
+	return string(s.Token())
 }
 
-func (s *Spike) ApplyEdges(g *Game, edges []math.Vector2) {
+func (s *Spike) Transform(g *Game, dir Direction, affectingStates map[Actor]StateChange) (*StateChange, Actor) {
+	return nil, nil
+}
+
+func (s *Spike) Apply(g *Game, change StateChange) {
 
 }
 
-func (s *Spike) ResolveState(g *Game) {
+func (s *Spike) Tick(g *Game) {
 	s.up = !s.up
+
 	if s.up {
 		actors := g.GetActors(s.GetPosition())
 		for _, actor := range actors {
-			if actor.Token() == SlimeToken {
-				g.RemoveActor(actor)
+			if actor != s {
+				actor.Damage(g)
 			}
 		}
 	}
@@ -43,4 +46,8 @@ func (s *Spike) ResolveState(g *Game) {
 
 func (s *Spike) Solid() bool {
 	return false
+}
+
+func (s *Spike) Damage(g *Game) {
+
 }
